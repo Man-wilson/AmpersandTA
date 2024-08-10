@@ -16,7 +16,9 @@ import com.ampersand.ampersandtechnicalassessment.viewmodel.MainViewModel
 import com.ampersand.ampersandtechnicalassessment.screens.ListView
 import com.ampersand.ampersandtechnicalassessment.screens.DetailsView
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.compose.ui.platform.LocalContext
+import androidx.navigation.NavController
+import android.content.res.Configuration
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,28 +40,75 @@ class MainActivity : ComponentActivity() {
 fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val navController = rememberNavController()
     val windowSize = rememberWindowSize()
+    val isTablet = LocalContext.current.resources.getBoolean(R.bool.isTablet)
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-    when (windowSize.widthSizeClass) {
-        WindowWidthSizeClass.Compact -> {
-            NavHost(navController = navController, startDestination = "listView") {
-                composable("listView") {
-                    ListView(viewModel = viewModel, navController = navController)
-                }
-                composable("detailsView/{objectId}") { backStackEntry ->
-                    val objectId = backStackEntry.arguments?.getString("objectId")
-                    DetailsView(objectId = objectId, viewModel = viewModel)
-                }
+    val objects by viewModel.objects.collectAsState()
+    var selectedObjectId by remember { mutableStateOf<String?>(null) }
+
+    // This effect will update selectedObjectId for both layouts
+    DisposableEffect(navController) {
+        val listener = NavController.OnDestinationChangedListener { _, destination, arguments ->
+            if (destination.route?.startsWith("detailsView") == true) {
+                selectedObjectId = arguments?.getString("objectId")
             }
         }
-        else -> {
-            Row(modifier = Modifier.fillMaxSize()) {
-                Box(modifier = Modifier.weight(1f)) {
-                    ListView(viewModel = viewModel, navController = navController)
+        navController.addOnDestinationChangedListener(listener)
+        onDispose {
+            navController.removeOnDestinationChangedListener(listener)
+        }
+    }
+
+    if (isTablet && isLandscape) {
+        // Tablet landscape layout
+        Row(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.weight(1f)) {
+                ListView(
+                    viewModel = viewModel,
+                    onItemClick = { id -> selectedObjectId = id }
+                )
+            }
+            Box(modifier = Modifier.weight(1f)) {
+                DetailsView(
+                    objectId = selectedObjectId,
+                    viewModel = viewModel
+                )
+            }
+        }
+    } else {
+        // Phone or tablet portrait layout
+        when (windowSize.widthSizeClass) {
+            WindowWidthSizeClass.Compact -> {
+                NavHost(navController = navController, startDestination = "listView") {
+                    composable("listView") {
+                        ListView(
+                            viewModel = viewModel,
+                            onItemClick = { id -> navController.navigate("detailsView/$id") }
+                        )
+                    }
+                    composable("detailsView/{objectId}") { backStackEntry ->
+                        val objectId = backStackEntry.arguments?.getString("objectId")
+                        DetailsView(
+                            objectId = objectId,
+                            viewModel = viewModel
+                        )
+                    }
                 }
-                Box(modifier = Modifier.weight(1f)) {
-                    val currentBackStackEntry by navController.currentBackStackEntryAsState()
-                    val selectedObjectId = currentBackStackEntry?.arguments?.getString("objectId")
-                    DetailsView(objectId = selectedObjectId, viewModel = viewModel)
+            }
+            else -> {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        ListView(
+                            viewModel = viewModel,
+                            onItemClick = { id -> selectedObjectId = id }
+                        )
+                    }
+                    Box(modifier = Modifier.weight(1f)) {
+                        DetailsView(
+                            objectId = selectedObjectId,
+                            viewModel = viewModel
+                        )
+                    }
                 }
             }
         }
