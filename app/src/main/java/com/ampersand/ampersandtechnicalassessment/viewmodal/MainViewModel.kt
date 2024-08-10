@@ -5,12 +5,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ampersand.ampersandtechnicalassessment.data.ObjectData
 import com.ampersand.ampersandtechnicalassessment.network.ApiService
-import com.ampersand.ampersandtechnicalassessment.network.ApiResponse
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import com.ampersand.ampersandtechnicalassessment.network.ApiResponse
 
 class MainViewModel : ViewModel() {
     private val _objects = MutableStateFlow<List<ObjectData>>(emptyList())
@@ -49,11 +49,15 @@ class MainViewModel : ViewModel() {
             }
         }
     }
-}
 
-// data class
-data class ApiResponse(
-    val id: String,
-    val name: String,
-    val data: Map<String, Any>?
-)
+    fun getFormattedData(objectData: ObjectData): List<Pair<String, String>> {
+        return try {
+            objectData.data?.map { (key, value) ->
+                key to value.toString()
+            } ?: emptyList()
+        } catch (e: Exception) {
+            Log.e("MainViewModel", "Error formatting data", e)
+            listOf("Error" to "Failed to format data")
+        }
+    }
+}
